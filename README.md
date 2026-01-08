@@ -5,8 +5,24 @@
 
 A tool for manipulating shapes inside a 2-d plot
 
-installation  `python -m pip install git+https://github.com/caganze/easyshapey.git`
-or `pip install easyshapey`
+## Installation
 
+```bash
+python -m pip install git+https://github.com/caganze/easyshapey.git
+```
+
+or
+
+```bash
+pip install easyshapey
+```
+
+## Version
+
+Current version: **0.0.3**
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+
+## Tutorial
 
 [Tutorial](https://github.com/caganze/wispshapes/blob/master/examples/tutorial.ipynb)
