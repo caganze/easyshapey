@@ -1,5 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-__all__=['shapes', 'selector']
+__all__=['shapes', 'selector', 'Polygon', 'Box', 'RotatedBox', 'Oval', 'Shape', 'Selector']
 from .core import *
-from .selector import*
+from .selector import *

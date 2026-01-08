@@ -1,16 +1,21 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.4
 Name: easyshapey
-Version: 0.0.1
+Version: 0.0.3
 Summary:  package to draw boxes in 2d plots
 Home-page: https://github.com/caganze/easyshapey
 Author: caganze
 Author-email: caganze@gmail.com
-License: UNKNOWN
-Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
 Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Description-Content-Type: text/markdown
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: summary
 
 [![N|Solid](https://travis-ci.org/caganze/shapes.svg?branch=master)](https://travis-ci.org/caganze/wispshapes/)
 [![Documentation Status](https://readthedocs.org/projects/wispshapes/badge/?version=latest)](https://wispshapes.readthedocs.io/en/latest/?badge=latest)
@@ -19,10 +24,24 @@ Description-Content-Type: text/markdown
 
 A tool for manipulating shapes inside a 2-d plot
 
-installation  `python -m pip install git+https://github.com/caganze/shapey.git `
+## Installation
 
+```bash
+python -m pip install git+https://github.com/caganze/easyshapey.git
+```
+
+or
+
+```bash
+pip install easyshapey
+```
+
+## Version
+
+Current version: **0.0.3**
+
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes.
+
+## Tutorial
 
 [Tutorial](https://github.com/caganze/wispshapes/blob/master/examples/tutorial.ipynb)
-
-[working on documentation ](https://caganze.github.io/wispshapes/)
-

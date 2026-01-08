@@ -1,625 +1,797 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Mon Jul 17 17:06:57 2017
+Core shape classes for easyshapey.
 
-@author: caganze
+Provides 2D shape manipulation for data selection in plots.
+Supports Box, RotatedBox, Oval, and arbitrary N-sided Polygons.
+
+Author: caganze
 """
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-
 import matplotlib.patches as patches
-import random as rd
-#from itertools import combinations
-#from functools import reduce
-import pandas as pd
-#import statsmodels.nonparametric.kernel_density as kde
 from matplotlib.path import Path
-
-from abc import ABCMeta
-from abc import abstractproperty
-from decimal import Decimal
-#import functools 
 from matplotlib.patches import Ellipse
+from abc import ABCMeta, abstractproperty
 import math
 
-import copy
+
+class BadVerticesFormatError(Exception):
+    """Raised when vertices format is invalid for a shape."""
+    pass
 
 
 class Shape(object):
-	"""
-    Main class 
-
-    Extended description of function
-  
     """
-	__metaclass__=ABCMeta
-	def __init__(self, **kwargs):
-		self.xrange=kwargs.get('xrange', []) #the range
-		self.yrange=kwargs.get('yrange', [])
-		self._color=kwargs.get('color', None)
-		self.alpha=kwargs.get('alpha', 0.3)
-		self.linewidth=kwargs.get('lw', 2)
-		self.linestyle=kwargs.get('linestyle', '--')
-		self.edgecolor=kwargs.get('color', 'k')
-		self.codes=[Path.MOVETO, Path.LINETO,Path.LINETO,Path.LINETO,Path.CLOSEPOLY]
-		self._shapetype=None
-		self._coeffs=None
+    Abstract base class for 2D shapes.
 
-	def __repr__(self):
-		return 'shape'
-		
-	@abstractproperty
-	def shapetype(self):
-		return self._shapetype
-		
-	@shapetype.setter
-	def shapetype(self, s_type):
-		"""
-		Returns string, shape of object
-		"""
-		self._shapetype=s_type
-		
-	#make it ok to change the color 
-	@abstractproperty
-	def color(self):
-		return self._color
-		
-	@color.setter
-	def color(self, new_color):
-		self._color=new_color
-		
-	@abstractproperty
-	def spath(self):
-		return Path(self.vertices, self.codes)
-	
-	def _select(self, data):
-		"""
-		Selects by countouring over points
-
-	    Args:
-	        data: a 2d- numpy array or pandas dataframe
-
-	    Returns:
-	       selected data and boolean values for selecting data
-
-	    Raises:
-
-	    """
-		if self.__repr__ =='oval':
-			bools=self.ellipse.contains_points(list(map(tuple, data.T)), transform=None, radius=0.0) 
-		if not self.__repr__=='oval':
-			bools=self.spath.contains_points(list(map(tuple, data.T)), transform=None, radius=0.0)
-			
-		selected_data=np.array([data[0][bools], data[1][bools]])
-
-		return selected_data, bools
-
-	def select(self, data):
-		"""
-		Selects by countouring over points
-
-	    Args:
-	        data: a 2d- numpy array or pandas dataframe
-
-	    Returns:
-	       selected data and boolean values for selecting data
-
-	    """
-		sels=None
-		if len(data)==0:
-			raise ValueError('Please pass some data lol')
-			
-		if isinstance(data, pd.DataFrame):
-			data.columns=['x', 'y']
-			bools=self._select(np.array([data['x'].values, data['y'].values]))[1]
-			sels=data[bools]
-
-		#print (data)
-		if (len(data) !=0) and (not isinstance(data, pd.DataFrame)):
-			sels=self._select(data)[0]
-
-			
-		return sels
-		
-
-
-		
-class BadVerticesFormatError(Exception):
-	pass
-
-class Box(Shape):
-	"""
-    Summary line.
-
-    Extended description of function.
+    Provides common interface for shape manipulation, data selection,
+    and visualization on matplotlib axes.
 
     Parameters
     ----------
-    arg1 : int
-        Description of arg1
-    arg2 : str
-        Description of arg2
-
-    Returns
-    -------
-    int
-        Description of return value
-
+    xrange : list, optional
+        X-axis range [min, max].
+    yrange : list, optional
+        Y-axis range [min, max].
+    color : str, optional
+        Fill color for the shape.
+    alpha : float, optional
+        Transparency (0-1). Default 0.3.
+    lw : float, optional
+        Line width. Default 2.
+    linestyle : str, optional
+        Line style. Default '--'.
     """
-	def __init__(self, **kwargs):
-		super().__init__()
-		self.shapetype=kwargs.get('shapetype', 'box')
-		self.completeness=kwargs.get('completeness',0.85)
-		self.contamination=np.nan
-		self._data=None # a pandas object with two or more columns (should have x and y	 for directions)
-		self._data_type=None #this is to inform whether the data are contaminants (do not change the box)
-		self._scatter=None
-		self._pol=None
-		self._vertices=None
-		self._angle=None
-		self._coeffs=None
-		self.sigma=kwargs.get('sigma', 1)
-		self.xshift=kwargs.get('xshift', 0.1)
-	def __repr__(self):
-		return 'box'
+    __metaclass__ = ABCMeta
 
-	def __len__(self):
-		if self._data is None:
-			return 0
-		else:
-			return len(self.data[0])
+    def __init__(self, **kwargs):
+        self.xrange = kwargs.get('xrange', [])
+        self.yrange = kwargs.get('yrange', [])
+        self._color = kwargs.get('color', None)
+        self.alpha = kwargs.get('alpha', 0.3)
+        self.linewidth = kwargs.get('lw', 2)
+        self.linestyle = kwargs.get('linestyle', '--')
+        self.edgecolor = kwargs.get('color', 'k')
+        self.codes = [Path.MOVETO, Path.LINETO, Path.LINETO, Path.LINETO, Path.CLOSEPOLY]
+        self._shapetype = None
+        self._coeffs = None
 
-	
-	@property 
-	def center(self):
-		"""
-	    Summary line.
+    def __repr__(self):
+        return 'shape'
 
-	    Extended description of function.
+    @abstractproperty
+    def shapetype(self):
+        """str: Type identifier for the shape."""
+        return self._shapetype
 
-	    Parameters
-	    ----------
-	    arg1 : int
-	        Description of arg1
-	    arg2 : str
-	        Description of arg2
+    @shapetype.setter
+    def shapetype(self, s_type):
+        self._shapetype = s_type
 
-	    Returns
-	    -------
-	    int
-	        Description of return value
+    @abstractproperty
+    def color(self):
+        """str: Fill color for the shape."""
+        return self._color
 
-	    """
-		vs=np.array(self.vertices)
-		return (np.nanmean(vs[:,0]), np.nanmean(vs[:,1]))
+    @color.setter
+    def color(self, new_color):
+        self._color = new_color
 
-	@property
-	def angle(self):
+    @abstractproperty
+    def spath(self):
+        """matplotlib.path.Path: Path object for rendering."""
+        return Path(self.vertices, self.codes)
 
-		x1, y1=self.vertices[0]
-		x2, y2= self.vertices[1]
-		dist = math.hypot(x2 - x1, y2 - y1)
-		dx=abs(x2-x1)
-		if y2 > y1:
-			ang=np.arccos(dx/dist)
-		else:
-			ang=np.arccos(dx/dist)
-		return ang
+    def _select(self, data):
+        """
+        Internal selection using path containment.
 
-	@property
-	def vertices(self):
-		"""
-		The vertices of a box are defined by the center and half the xranges and y ranges
-		They must follow a clockwise, direction (and back ) i.e (v1, v2, v3, v4, v1) with v1 
-		having the smallest x value
-		"""
-		return self._vertices
-		
-	@vertices.setter
-	def vertices(self, vertices):
-		"""
-		create vertices properties of a box
-		"""
-		flag1=np.isclose(np.array(vertices[0]), np.array(vertices[-1]), equal_nan=True, rtol=0.0001).all()
-		#flag2= vertices[:,0].T == vertices
-		
-		if not flag1 :
-			#should check that vertices define	a square, 
-			#there is a precision example for this 
-			raise BadVerticesFormatError('''Invalid vertices for a Box, vertices first element {}  must be equal to the last element {} must be equal within 10^-4'''.format(vertices[0], vertices[-1]))
-		
-		vs_x= np.array(vertices)[:, 0]
-		vs_y=np.array(vertices)[:,1]
-		argxmin=np.argmin(np.array(vertices)[:, 0])
-		argxmax=np.argmax(np.array(vertices)[:, 0])
-		self.xrange= [vs_x[np.argmin(vs_x)], vs_x[np.argmax(vs_x)]]
-		self.yrange=[vs_y[np.argmin(vs_y)], vs_y[np.argmax(vs_y)]]
-		self._vertices=vertices
-		
-		#v1=(self.center[0]-0.5*np.ptp(self.xrange), self.center[1]+0.5*np.ptp(self.yrange))
-		#v2=(self.center[0]+0.5*np.ptp(self.xrange), self.center[1]+0.5*np.ptp(self.yrange))
-		#v3=(self.center[0]+0.5*np.ptp(self.xrange), self.center[1]-0.5*np.ptp(self.yrange))
-		#v4=(self.center[0]-0.5*np.ptp(self.xrange), self.center[1]-0.5*np.ptp(self.yrange))
-		
-	
-	@property
-	def area(self):
-		"""
-		Area is dx*dy
-		"""
-		return abs( np.ptp(self.xrange)*np.ptp(self.yrange))
+        Parameters
+        ----------
+        data : ndarray
+            2D array with shape (2, n_points).
 
-	@property
-	def data(self):
-		return np.array(self._data)
+        Returns
+        -------
+        tuple
+            (selected_data, boolean_mask)
+        """
+        if self.__repr__() == 'oval':
+            bools = self.ellipse.contains_points(list(zip(data[0], data[1])))
+        else:
+            bools = self.spath.contains_points(list(zip(data[0], data[1])))
+        return np.array([data[0][bools], data[1][bools]]), bools
 
-	@data.setter
-	def data(self, input):
-		"""
-		input must be a 2d-numpy array
-		x is assumed to be data[0]
-		y is assumed tp be data[1]
-		xerr is data[2] etc.
-		similar assumptions are made about yerr 
-		"""
-		if not self._data_type=='contam':
-			#fit a line to the data
-			if isinstance(input, pd.DataFrame):
-				data=input.values.T
-			#else: 
-			x=input[0]
-			y=input[1]
-			#if no error arrays are given, assume zero
-			if input.shape[0] ==2:
-				xerr=np.zeros(len(x)) #i don't use this much
-				mu=np.nanmean(y)
-				sigma=np.nanstd(y)
-				yerr= np.random.normal(mu, sigma, len(y))
-			#otherwise, retrieve the values
-			else:
-				xerr=input[2]
-				yerr=input[3]
+    def select(self, data):
+        """
+        Select data points inside the shape.
 
-			#x_max=np.nanmedian(x)+self.sigma*np.nanstd(x)
-			#x_min=np.nanmedian(x)-self.sigma*np.nanstd(x)
-			x_min=np.nanmin(x)
-			x_max=np.nanmax(x)
+        Parameters
+        ----------
+        data : ndarray or DataFrame
+            2D array (2, n) or DataFrame with x, y columns.
 
-			y_max=np.nanmedian(y)+self.sigma*np.nanstd(y)
-			y_min=np.nanmedian(y)-self.sigma*np.nanstd(y)
+        Returns
+        -------
+        ndarray or DataFrame
+            Points contained within the shape.
 
-			dx=x_max-x_min
-			dy=y_max-y_min
+        Raises
+        ------
+        ValueError
+            If data is empty.
+        """
+        if len(data) == 0:
+            raise ValueError('Data cannot be empty')
 
-			#add fudge factor to xlimits
-			x_max=x_max+self.xshift*dx 
-			x_min=x_min-self.xshift*dx
-
-			mask1=np.logical_and(x>x_min, x<x_max)
-			mask2=np.logical_and(y>y_min, y<y_max)
-			
-			#use matrix algebra to determine the best fit line given uncertainties
-			#Y = y.reshape(-1,1)
-			#A = np.vstack((np.ones_like(x), x)).T
-			#C = np.diag(yerr**2)
-
-			#X = np.linalg.inv(A.transpose()@np.linalg.inv(C)@A) @ (A.transpose()@np.linalg.inv(C)@Y)
-			#if the user asks for a reactangle then give them a reactangle
-			if self.shapetype=='box':
-				pol = np.poly1d(np.polyfit(x[mask2], y[mask2], 1))
-
-			if self.shapetype =='rectangle':
-				pol=np.poly1d(np.polyfit(x[mask2], np.ones_like(y[mask2])*np.nanmedian(y[mask2]), 1))
-			
-			coeffs = pol.coefficients
-			ys=pol([x_min, x_max])
+        if isinstance(data, pd.DataFrame):
+            data.columns = ['x', 'y']
+            bools = self._select(np.array([data['x'].values, data['y'].values]))[1]
+            return data[bools]
+        return self._select(data)[0]
 
 
-			scatter= self.sigma* np.nansum(np.sqrt((y[mask2]- pol(x[mask2]))**2)/len(x[mask2]))
+class Box(Shape):
+    """
+    Rectangular/parallelogram shape fitted to data.
 
-			ys_above= ys+scatter
-			ys_below=ys-scatter
+    Fits a linear trend to data and creates a box around it.
+    Supports rotation and data selection.
 
-			v1= (x_min, ys_above[0])
-			v2=(x_max, ys_above[1])
-			v4= (x_min,	 ys_below[0])
-			v3=(x_max,	ys_below[1])
+    Parameters
+    ----------
+    shapetype : str, optional
+        'box' (fitted to trend) or 'rectangle' (horizontal). Default 'box'.
+    sigma : float, optional
+        Width multiplier for scatter. Default 1.
+    xshift : float, optional
+        X-axis padding fraction. Default 0.1.
+    """
 
-			self.vertices=[v1, v2, v3, v4, v1]
-			self._data=np.array([x, y])
-			self._scatter=scatter
-			self._pol=pol
-			self._coeffs=coeffs
-		else:
-			self._data=input
-			
-	@property
-	def datatype(self):
-		return self._data_type
-	
-	@datatype.setter
-	def datatype(self, new_type):
-		"""
-		chnaging the lable for the type of data passed onto the box
-		"""
-		self._data_type=new_type
-			
-	@property
-	def efficiency(self):
-		"""
-		This is really a completeness or a contamination, based on the data that's passed in
-		"""
-		eff=float(len(self.select(self.data)[0])) /float(len(self.data[0]))
-		return eff
-	@property
-	def scatter(self):
-		"""
-		the scatter between the data and the center line
-		"""
-		return self._scatter
-	
-	@property
-	def coeffs(self):
-		"""
-		coefficients of the line (slope and y-intercept
-		"""
-		return self._coeffs
-		
-	def contains(self, points):
-		"""
-		If point belongs to this path, it returns true otherwise it returns false
-		points must be a list of tuples
-		INPUT: list of tuples
-		"""
-		#_points=
-		return [self.spath.contains_point(x, transform=None, radius=0.0) for x in points]
-		
-	def rotate(self,  ang, **kwargs):
-	
-		"""
-		rotate a box by an angle
-		angles are always measured in radians
-		
-		the center of rotation is defined by the mean of the vertices
-		the axis of rotation is the line passing through the center,
-		 parallel to the edges of the box
-		"""
-	
-		vs=np.array(self.vertices)
-	
-		r=[[np.cos(ang), -np.sin(ang)],
-			 [np.sin(ang), np.cos(ang)]]
-	
-		c=kwargs.get('center', self.center)
-	
-	
-		i=np.identity(2)
-	
-		mat=np.matrix([[r[0][0], r[0][1], np.dot(i-r, c)[0]],
-				[r[1][0], r[1][1], np.dot(i-r, c)[1]],
-				[0., 0., 1.]])
-	
-		xs=vs[:, 0]
-		ys=vs[:, 1]
-		zs=np.array([1. for x in xs])
-	
-		rotated=np.array(np.dot(mat, np.array([xs, ys, zs])))
-	
-		#reformat
-		new_vs=rotated.reshape((3, len(self.vertices)))[:2]
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.shapetype = kwargs.get('shapetype', 'box')
+        self.completeness = kwargs.get('completeness', 0.85)
+        self.contamination = np.nan
+        self._data = None
+        self._data_type = None
+        self._scatter = None
+        self._pol = None
+        self._vertices = None
+        self._angle = None
+        self._coeffs = None
+        self.sigma = kwargs.get('sigma', 1)
+        self.xshift = kwargs.get('xshift', 0.1)
 
-		#print (np.array(new_vs.T)[0])
-		if kwargs.get('set_vertices', True):
-			self.vertices=np.array(new_vs.T)
-			return 
-		else:
-			return new_vs.T
+    def __repr__(self):
+        return 'box'
 
-	def plot(self, **kwargs):
-		"""
-		display a box, must pass matploltib axes as argument 
-		"""
-		xlim=kwargs.get('plot_xlim', [])
-		ylim=kwargs.get('plot_ylim', [])
-		ax1= kwargs.get('ax', plt.gca())
-		size=kwargs.get('size', 0.1)
-		if not kwargs.get('only_shape', True):
-			 ax1.plot(self.data[0], self.data[1], 'k.', ms=size)
-		
-		alpha=self.alpha
-		if kwargs.get('highlight', False):
-			self.linewidth=3.5
-			self.linestyle='-'
-			self.edgecolor='#111111'
-			#alpha=self.alpha
-			#self.color='none'
-		
-		#self.color=None
-		#print ('selfcolor', self.color)
-		patch =patches.PathPatch(self.spath, 
-						facecolor=self.color, 
-							alpha=alpha, 
-							edgecolor=self.edgecolor, 
-							linewidth=self.linewidth,
-							linestyle=self.linestyle)
-							
-		ax1.add_patch(patch)
-		label=kwargs.get('label', None)
-		if label is not None: 
-			ax1.text(self.center[0], self.center[1]+self._scatter, label, fontsize=15, rotation=360-self.angle*57.2958, color='#111111')
-		if kwargs.get('set_limits', False):
-			 ax1.set_xlim(xlim)
-			 ax1.set_ylim(ylim)
+    def __len__(self):
+        return 0 if self._data is None else len(self.data[0])
 
-			 
+    @property
+    def center(self):
+        """tuple: (x, y) center of the box."""
+        vs = np.array(self.vertices)
+        return (np.nanmean(vs[:, 0]), np.nanmean(vs[:, 1]))
+
+    @property
+    def angle(self):
+        """float: Angle of first edge in radians."""
+        x1, y1 = self.vertices[0]
+        x2, y2 = self.vertices[1]
+        dist = math.hypot(x2 - x1, y2 - y1)
+        return np.arccos(abs(x2 - x1) / dist) if dist > 0 else 0.0
+
+    @property
+    def vertices(self):
+        """list: Vertices as [(x1,y1), (x2,y2), ...] closed polygon."""
+        return self._vertices
+
+    @vertices.setter
+    def vertices(self, vertices):
+        vs = np.array(vertices)
+        if not np.allclose(vs[0], vs[-1], rtol=1e-4):
+            raise BadVerticesFormatError(
+                f'First vertex {vertices[0]} must equal last {vertices[-1]}'
+            )
+        self.xrange = [vs[:, 0].min(), vs[:, 0].max()]
+        self.yrange = [vs[:, 1].min(), vs[:, 1].max()]
+        self._vertices = vertices
+
+    @property
+    def area(self):
+        """float: Area of the bounding box."""
+        return abs(np.ptp(self.xrange) * np.ptp(self.yrange))
+
+    @property
+    def data(self):
+        """ndarray: Data array used to fit the box."""
+        return np.array(self._data)
+
+    @data.setter
+    def data(self, input_data):
+        if self._data_type == 'contam':
+            self._data = input_data
+            return
+
+        if isinstance(input_data, pd.DataFrame):
+            input_data = input_data.values.T
+
+        x, y = input_data[0], input_data[1]
+        x_min, x_max = np.nanmin(x), np.nanmax(x)
+        dx = x_max - x_min
+        x_min -= self.xshift * dx
+        x_max += self.xshift * dx
+
+        y_med, y_std = np.nanmedian(y), np.nanstd(y)
+        mask = np.abs(y - y_med) < self.sigma * y_std
+
+        if self.shapetype == 'rectangle':
+            pol = np.poly1d([0, y_med])
+        else:
+            pol = np.poly1d(np.polyfit(x[mask], y[mask], 1))
+
+        ys = pol([x_min, x_max])
+        scatter = self.sigma * np.sqrt(np.mean((y[mask] - pol(x[mask]))**2))
+
+        v1, v2 = (x_min, ys[0] + scatter), (x_max, ys[1] + scatter)
+        v3, v4 = (x_max, ys[1] - scatter), (x_min, ys[0] - scatter)
+
+        self._vertices = [v1, v2, v3, v4, v1]
+        self._data = np.array([x, y])
+        self._scatter = scatter
+        self._pol = pol
+        self._coeffs = pol.coefficients
+
+    @property
+    def datatype(self):
+        """str: Data type label ('contam' or None)."""
+        return self._data_type
+
+    @datatype.setter
+    def datatype(self, new_type):
+        self._data_type = new_type
+
+    @property
+    def efficiency(self):
+        """float: Fraction of data points inside the box."""
+        return len(self.select(self.data)[0]) / len(self.data[0])
+
+    @property
+    def scatter(self):
+        """float: Scatter from the center line."""
+        return self._scatter
+
+    @property
+    def coeffs(self):
+        """ndarray: Polynomial coefficients [slope, intercept]."""
+        return self._coeffs
+
+    def contains(self, points):
+        """
+        Check if points are inside the box.
+
+        Parameters
+        ----------
+        points : list of tuples
+            Points as [(x1, y1), (x2, y2), ...].
+
+        Returns
+        -------
+        list of bool
+            True for each point inside.
+        """
+        return [self.spath.contains_point(p) for p in points]
+
+    def rotate(self, ang, **kwargs):
+        """
+        Rotate the box around its center.
+
+        Parameters
+        ----------
+        ang : float
+            Rotation angle in radians.
+        center : tuple, optional
+            Custom rotation center (x, y).
+        set_vertices : bool, optional
+            If True, update in place. Default True.
+
+        Returns
+        -------
+        ndarray or None
+            New vertices if set_vertices=False.
+        """
+        vs = np.array(self.vertices)
+        c = np.array(kwargs.get('center', self.center))
+        cos_a, sin_a = np.cos(ang), np.sin(ang)
+        rot = np.array([[cos_a, -sin_a], [sin_a, cos_a]])
+
+        rotated = (vs[:, :2] - c) @ rot.T + c
+        new_vs = [(r[0], r[1]) for r in rotated]
+
+        if kwargs.get('set_vertices', True):
+            self._vertices = new_vs
+        else:
+            return np.array(new_vs)
+
+    def plot(self, **kwargs):
+        """
+        Plot the box on matplotlib axes.
+
+        Parameters
+        ----------
+        ax : Axes, optional
+            Matplotlib axes. Default current axes.
+        highlight : bool, optional
+            Use thicker lines if True.
+        label : str, optional
+            Text label at center.
+        only_shape : bool, optional
+            If False, also plot data points.
+        """
+        ax = kwargs.get('ax', plt.gca())
+
+        if kwargs.get('highlight', False):
+            self.linewidth, self.linestyle = 3.5, '-'
+            self.edgecolor = '#111111'
+
+        if not kwargs.get('only_shape', True):
+            ax.plot(self.data[0], self.data[1], 'k.', ms=0.1)
+
+        patch = patches.PathPatch(
+            self.spath, facecolor=self.color, alpha=self.alpha,
+            edgecolor=self.edgecolor, linewidth=self.linewidth,
+            linestyle=self.linestyle
+        )
+        ax.add_patch(patch)
+
+        if kwargs.get('label'):
+            ax.text(self.center[0], self.center[1] + (self._scatter or 0),
+                    kwargs['label'], fontsize=15, color='#111111')
+
 
 class RotatedBox(Box):
+    """
+    Box that finds optimal rotation to minimize bounding area.
 
-	def __init__(self, **kwargs):
-		super().__init__()
-	
-		
-	@Box.data.setter
-	def data(self, df):
-		if not self._data_type=='contam':
-			#define vertices as min and max of the data
-			x=np.array(df.x)
-			y=np.array(df.y)
-			
-			x_max=np.nanmax(x)
-			x_min=np.nanmin(x)
-			
-			y_max=np.nanmax(y)
-			y_min=np.nanmin(y)
-			
-			v1= (x_min, y_max)
-			v2=(x_max, y_max)
-			v4= (x_min,	 y_min)
-			v3=(x_max,	y_min)
-			
-			vs=[v1, v2, v3, v4, v1]
-			self._data=df
-			
-			self.vertices=vs
-			areas=[]
-			all_vertices=[]
-			
-			for alpha in np.linspace(0., 0.5*np.pi, 1000):
-				vs=self.rotate(alpha, set_vertices=False)
-				all_vertices.append(vs)
-				areas.append(np.ptp(vs[:,0])*np.ptp(vs[:, 1]))
-	
-			best= np.argmin(areas)
-			self.vertices=np.array(all_vertices)[best]
-			
-		else:
-			self._data=df
-			
-		return 
-	
+    Automatically rotates to find the smallest enclosing rectangle.
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    @Box.data.setter
+    def data(self, df):
+        if self._data_type == 'contam':
+            self._data = df
+            return
+
+        x, y = np.array(df.x), np.array(df.y)
+        v1 = (x.min(), y.max())
+        v2 = (x.max(), y.max())
+        v3 = (x.max(), y.min())
+        v4 = (x.min(), y.min())
+
+        self._data = df
+        self._vertices = [v1, v2, v3, v4, v1]
+
+        # Find optimal rotation (minimal area)
+        best_area, best_vs = float('inf'), None
+        for alpha in np.linspace(0, np.pi / 2, 100):
+            vs = self.rotate(alpha, set_vertices=False)
+            area = np.ptp(vs[:, 0]) * np.ptp(vs[:, 1])
+            if area < best_area:
+                best_area, best_vs = area, vs
+
+        if best_vs is not None:
+            self._vertices = [(v[0], v[1]) for v in best_vs]
+
+
 class Oval(Shape):
-	""" 
-	Oval with vertices define as extremes of the major and minor axes
-	"""
-	def __init__(self, **kwargs):
+    """
+    Elliptical shape fitted to data.
 
-		super().__init__()
-		self.shapetype='oval'
-		self.completeness=kwargs.get('completeness',0.85)
-		self.contamination=np.nan
-		self._data=None # a pandas object with two or more columns (should have x and y	 for directions)
-		self._data_type=None #this is to inform whether the data are contaminants (do not change the box)
-		self._scatter=None
-		self._pol=None
-		self._vertices=None
-		self._center=None
-		self._height=None
-		self._width=None
-		#self.codes=None
-		self._box=None 
-		self._ellipse=None
-	
-	def __repr__(self):
-		return 'oval'
+    Creates an ellipse based on a Box fitted to the data.
 
-	def __len__(self):
-		if self._data is None:
-			return 0
-		else:
-			return len(self.data)
+    Parameters
+    ----------
+    completeness : float, optional
+        Target completeness. Default 0.85.
+    """
 
-	@property
-	def angle(self):
-		return self._angle
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.shapetype = 'oval'
+        self.completeness = kwargs.get('completeness', 0.85)
+        self.contamination = np.nan
+        self._data = None
+        self._data_type = None
+        self._vertices = None
+        self._center = None
+        self._height = None
+        self._width = None
+        self._box = None
+        self._ellipse = None
+        self._angle = 0
 
-	@angle.setter
-	def angle(self, new_angle):
-		self.rotate(new_angle)
+    def __repr__(self):
+        return 'oval'
 
-	@property
-	def center(self):
-		return self._center
+    def __len__(self):
+        return 0 if self._data is None else len(self._data)
 
-	@property
-	def height(self):
-		return self._height
+    @property
+    def angle(self):
+        """float: Rotation angle in radians."""
+        return self._angle
 
-	@property 
-	def width(self):
-		return self._width
+    @property
+    def center(self):
+        """tuple: (x, y) center of the ellipse."""
+        return self._center
 
-	@property
-	def vertices(self):
-		return self._vertices
+    @property
+    def height(self):
+        """float: Height of the ellipse."""
+        return self._height
 
+    @property
+    def width(self):
+        """float: Width of the ellipse."""
+        return self._width
 
-	@property
-	def box(self):
-		"""
-		an ellispe has an underlying box
-		"""
-		return self._box
+    @property
+    def vertices(self):
+        """list: Bounding vertices from underlying box."""
+        return self._vertices
 
-	@property
-	def ellipse(self):
-		if self._ellipse is not None:
-			self._ellipse.set_alpha(self.alpha)
-			self._ellipse.set_facecolor(self.color)
-		return self._ellipse
+    @property
+    def box(self):
+        """Box: Underlying box used to create the ellipse."""
+        return self._box
 
-	@ellipse.setter
-	def ellipse(self, new_ellipse):
-		self._ellipse=new_ellipse
-		self._center=new_ellipse.center
-		self._angle=new_ellipse.angle
-		self._box=b
-		self._width=new_ellipse.width
-		self._height=new_ellipse.height
-	
-	@property
-	def data(self, df):
-		return self._data
+    @property
+    def ellipse(self):
+        """Ellipse: Matplotlib Ellipse patch."""
+        if self._ellipse is not None:
+            self._ellipse.set_alpha(self.alpha)
+            self._ellipse.set_facecolor(self.color)
+        return self._ellipse
 
-	@data.setter
-	def data(self, df):
-		#determines ellipse by fitting to a box
-		b=Box()
-		b.data=df
-		vs=np.array(b.vertices)
-		self._vertices=vs
-		self._center=[np.mean(vs[:, 0]), np.mean(vs[:, 1])]
-		self._angle=b.angle
-		self._box=b
-		#the distance formula
-		self._height=np.sqrt((vs[1][0]-vs[2][0])**2+(vs[1][1]-vs[2][1])**2)
-		self._width=np.sqrt((vs[1][0]-vs[2][0])**2+(vs[1][1]-vs[2][1])**2)
-		self._ellipse=Ellipse(self._center, self._width, self._height, self._angle)
-		self._data=df
+    @property
+    def data(self):
+        """ndarray: Data used to fit the ellipse."""
+        return self._data
 
-	def rotate(self, angle):
-		self.ellipse= self._ellipse.set_alpha(angle)
+    @data.setter
+    def data(self, df):
+        b = Box()
+        b.data = df
+        vs = np.array(b.vertices)
+        self._vertices = vs
+        self._center = [np.mean(vs[:, 0]), np.mean(vs[:, 1])]
+        self._angle = b.angle
+        self._box = b
+        self._height = np.linalg.norm(vs[1] - vs[2])
+        self._width = np.linalg.norm(vs[0] - vs[1])
+        self._ellipse = Ellipse(self._center, self._width, self._height, np.degrees(self._angle))
+        self._data = df
 
-	def plot(self, **kwargs):
+    def plot(self, **kwargs):
+        """
+        Plot the ellipse on matplotlib axes.
 
-		ax=kwargs.get('ax', plt.gca())
+        Parameters
+        ----------
+        ax : Axes, optional
+            Matplotlib axes.
+        set_limits : bool, optional
+            If True, set axis limits.
+        """
+        ax = kwargs.get('ax', plt.gca())
+        ax.add_patch(self.ellipse)
 
-		xlim=kwargs.get('plot_xlim', [])
-		ylim=kwargs.get('plot_ylim', [])
-
-		
-		ax.add_patch(self.ellipse)
-
-		
-		if kwargs.get('set_limits', False):
-			 ax.set_xlim(xlim)
-			 ax.set_ylim(ylim)
-		
+        if kwargs.get('set_limits', False):
+            ax.set_xlim(kwargs.get('plot_xlim', []))
+            ax.set_ylim(kwargs.get('plot_ylim', []))
 
 
+class Polygon(Shape):
+    """
+    Arbitrary N-sided 2D polygon.
 
-	
-	
-	
+    Supports any polygon from triangles (N=3) to complex shapes.
+    Can be created from vertices or interactively via clicking.
 
+    Parameters
+    ----------
+    vertices : list of tuples, optional
+        Polygon vertices as [(x1, y1), (x2, y2), ...].
+        Auto-closes if last != first.
+
+    Examples
+    --------
+    >>> tri = Polygon(vertices=[(0, 0), (1, 0), (0.5, 1)])
+    >>> print(tri.n_sides)  # 3
+    >>> print(tri.area)     # 0.5
+    """
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._shapetype = kwargs.get('shapetype', 'polygon')
+        self._vertices = None
+        if 'vertices' in kwargs and kwargs['vertices'] is not None:
+            self.vertices = kwargs['vertices']
+
+    def __repr__(self):
+        return 'polygon'
+
+    def __len__(self):
+        return 0 if self._vertices is None else self.n_sides
+
+    @property
+    def n_sides(self):
+        """int: Number of sides."""
+        return 0 if self._vertices is None else len(self._vertices) - 1
+
+    @property
+    def shapetype(self):
+        """str: Shape type identifier."""
+        return self._shapetype
+
+    @shapetype.setter
+    def shapetype(self, s_type):
+        self._shapetype = s_type
+
+    @property
+    def color(self):
+        """str: Fill color."""
+        return self._color
+
+    @color.setter
+    def color(self, new_color):
+        self._color = new_color
+
+    @property
+    def vertices(self):
+        """list: Vertices as [(x, y), ...], closed polygon."""
+        return self._vertices
+
+    @vertices.setter
+    def vertices(self, vertices):
+        if vertices is None or len(vertices) < 3:
+            raise BadVerticesFormatError('Polygon requires >= 3 vertices')
+
+        vs = np.array(vertices, dtype=float)
+        if vs.ndim != 2 or vs.shape[1] != 2:
+            raise BadVerticesFormatError('Vertices must be [(x, y), ...]')
+
+        # Auto-close if needed
+        if not np.allclose(vs[0], vs[-1], rtol=1e-4):
+            vs = np.vstack([vs, vs[0]])
+
+        self.xrange = [vs[:, 0].min(), vs[:, 0].max()]
+        self.yrange = [vs[:, 1].min(), vs[:, 1].max()]
+        n = len(vs)
+        self.codes = [Path.MOVETO] + [Path.LINETO] * (n - 2) + [Path.CLOSEPOLY]
+        self._vertices = [tuple(v) for v in vs]
+
+    @property
+    def spath(self):
+        """matplotlib.path.Path: Path for rendering."""
+        if self._vertices is None:
+            raise ValueError('No vertices set')
+        return Path(self._vertices, self.codes)
+
+    @property
+    def center(self):
+        """tuple: Centroid (x, y)."""
+        if self._vertices is None:
+            return (0, 0)
+        vs = np.array(self._vertices[:-1])
+        return (vs[:, 0].mean(), vs[:, 1].mean())
+
+    @property
+    def area(self):
+        """float: Area using shoelace formula."""
+        if self._vertices is None or len(self._vertices) < 3:
+            return 0.0
+        vs = np.array(self._vertices[:-1])
+        x, y = vs[:, 0], vs[:, 1]
+        return 0.5 * abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+
+    @property
+    def angle(self):
+        """float: Angle of first edge in radians."""
+        if self._vertices is None or len(self._vertices) < 3:
+            return 0.0
+        v1, v2 = np.array(self._vertices[0]), np.array(self._vertices[1])
+        d = v2 - v1
+        dist = np.linalg.norm(d)
+        if dist == 0:
+            return 0.0
+        return np.arctan2(d[1], d[0])
+
+    def contains(self, points):
+        """
+        Check if points are inside the polygon.
+
+        Parameters
+        ----------
+        points : list of tuples
+            Points as [(x1, y1), ...].
+
+        Returns
+        -------
+        list of bool
+        """
+        return [self.spath.contains_point(p) for p in points]
+
+    def rotate(self, ang, **kwargs):
+        """
+        Rotate polygon around center.
+
+        Parameters
+        ----------
+        ang : float
+            Angle in radians.
+        center : tuple, optional
+            Custom rotation center.
+        set_vertices : bool, optional
+            Update in place if True (default).
+
+        Returns
+        -------
+        ndarray or None
+            New vertices if set_vertices=False.
+        """
+        if self._vertices is None:
+            return
+
+        vs = np.array(self._vertices[:-1])
+        c = np.array(kwargs.get('center', self.center))
+        cos_a, sin_a = np.cos(ang), np.sin(ang)
+        rot = np.array([[cos_a, -sin_a], [sin_a, cos_a]])
+
+        rotated = (vs - c) @ rot.T + c
+        new_vs = [tuple(v) for v in rotated] + [tuple(rotated[0])]
+
+        if kwargs.get('set_vertices', True):
+            self.vertices = new_vs
+        else:
+            return np.array(new_vs)
+
+    def plot(self, **kwargs):
+        """
+        Plot polygon on matplotlib axes.
+
+        Parameters
+        ----------
+        ax : Axes, optional
+            Matplotlib axes.
+        highlight : bool, optional
+            Use thicker lines.
+        label : str, optional
+            Text label at center.
+        """
+        if self._vertices is None:
+            raise ValueError('No vertices set')
+
+        ax = kwargs.get('ax', plt.gca())
+
+        if kwargs.get('highlight', False):
+            self.linewidth, self.linestyle = 3.5, '-'
+            self.edgecolor = '#111111'
+
+        patch = patches.PathPatch(
+            self.spath, facecolor=self.color, alpha=self.alpha,
+            edgecolor=self.edgecolor, linewidth=self.linewidth,
+            linestyle=self.linestyle
+        )
+        ax.add_patch(patch)
+
+        if kwargs.get('label'):
+            c = self.center
+            ax.text(c[0], c[1], kwargs['label'], fontsize=15,
+                    ha='center', va='center', color='#111111')
+
+    @staticmethod
+    def from_clicks(ax=None, min_points=3, max_points=None):
+        """
+        Create polygon interactively by clicking.
+
+        Parameters
+        ----------
+        ax : Axes, optional
+            Axes to click on. Creates new figure if None.
+        min_points : int, optional
+            Minimum vertices. Default 3.
+        max_points : int, optional
+            Maximum vertices. None for unlimited.
+
+        Returns
+        -------
+        Polygon
+            New polygon from clicked points.
+
+        Notes
+        -----
+        Press 'q' or close window when done.
+        """
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.set_title("Click points, press 'q' when done")
+            ax.grid(True, alpha=0.3)
+            ax.set_xlim(-10, 10)
+            ax.set_ylim(-10, 10)
+        else:
+            fig = ax.figure
+
+        points = []
+
+        def onclick(event):
+            if event.inaxes != ax or event.button != 1:
+                return
+            if max_points and len(points) >= max_points:
+                return
+            points.append((event.xdata, event.ydata))
+            ax.plot(event.xdata, event.ydata, 'ro', ms=8)
+
+            if len(points) >= 2:
+                xs, ys = zip(*points)
+                ax.plot(xs, ys, 'b-', lw=2, alpha=0.5)
+
+            fig.canvas.draw()
+
+        def onkey(event):
+            if event.key in ('q', 'Q') and len(points) >= min_points:
+                plt.close(fig)
+
+        fig.canvas.mpl_connect('button_press_event', onclick)
+        fig.canvas.mpl_connect('key_press_event', onkey)
+        plt.show(block=True)
+
+        if len(points) < min_points:
+            raise ValueError(f'Need {min_points} points, got {len(points)}')
+
+        return Polygon(vertices=points)
+
+    @staticmethod
+    def from_data(data, method='convex_hull', **kwargs):
+        """
+        Create polygon from data points.
+
+        Parameters
+        ----------
+        data : ndarray or DataFrame
+            Data points.
+        method : str
+            'convex_hull' or 'bounding_box'.
+        **kwargs
+            Passed to Polygon constructor.
+
+        Returns
+        -------
+        Polygon
+        """
+        if isinstance(data, pd.DataFrame):
+            pts = data[['x', 'y']].values if 'x' in data.columns else data.values
+        else:
+            pts = data.T if data.shape[0] == 2 else data
+
+        if method == 'bounding_box':
+            x_min, x_max = pts[:, 0].min(), pts[:, 0].max()
+            y_min, y_max = pts[:, 1].min(), pts[:, 1].max()
+            verts = [(x_min, y_min), (x_max, y_min), (x_max, y_max), (x_min, y_max)]
+        elif method == 'convex_hull':
+            from scipy.spatial import ConvexHull
+            hull = ConvexHull(pts)
+            verts = pts[hull.vertices].tolist()
+        else:
+            raise ValueError(f"Unknown method: {method}")
+
+        return Polygon(vertices=verts, **kwargs)
