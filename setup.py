@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="easyshapey",
-    version="0.0.4",
+    version="0.0.5",
     author="caganze",
     author_email="caganze@gmail.com",
     description=" package to draw boxes in 2d plots",
