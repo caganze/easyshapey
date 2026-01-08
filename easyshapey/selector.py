@@ -57,7 +57,7 @@ class Selector(object):
 			if New.logic=='or':
 				ids=set().union(*[list(self.data.index),	 list(other_selector.data.index)])
 			
-			New.data=data.ix[ids]
+			New.data=data.loc[ids]
 			return New
 	
 	@property 
@@ -147,7 +147,7 @@ class Selector(object):
 		if _logic=='or':
 			result_index=set().union(*selected)
 		
-		result=self.data.ix[result_index].drop_duplicates()
+		result=self.data.loc[result_index].drop_duplicates()
 		
 		
 		return result
