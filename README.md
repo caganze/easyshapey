@@ -86,6 +86,48 @@ from easyshapey import Polygon
 poly = Polygon.from_clicks(min_points=3)
 ```
 
+#### Using `from_clicks()` in Jupyter Notebooks
+
+The interactive `from_clicks()` method requires an interactive matplotlib backend. The default `inline` backend renders static images and won't capture mouse clicks.
+
+**Step 1:** Restart your kernel and use an interactive backend as the first command:
+
+```python
+# Use ONE of these (before any other matplotlib imports):
+%matplotlib tk       # Opens separate window (recommended)
+%matplotlib macosx   # macOS native backend
+```
+
+**Step 2:** Create your plot and click to define polygon vertices:
+
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+from easyshapey import Polygon
+
+x = np.random.rand(100)
+y = 2*x + 0.3*np.random.randn(100)
+
+fig, ax = plt.subplots()
+ax.scatter(x, y)
+
+# Click points on the figure, press 'q' when done
+poly = Polygon.from_clicks(ax=ax)
+```
+
+**Step 3:** Display the result inline:
+
+```python
+%matplotlib inline
+
+fig, ax = plt.subplots()
+ax.scatter(x, y, alpha=0.7)
+poly.plot(ax=ax, color='lightblue')
+plt.show()
+```
+
+> ⚠️ **Important:** Always press **'q'** to finish selecting points. Do not close the figure window by clicking the X button, as this may crash the Jupyter kernel on some systems.
+
 ### Polygon from Data
 
 ```python
